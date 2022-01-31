@@ -17,20 +17,20 @@ lit : STR -> l_str
     | CHAR -> l_char
     | NUM -> l_num
 
-?type : t_arr | t_call
+?typesig : ts_arr | ts_call
 
-    t_arr : "[" type "]"
+    ts_arr : "[" typesig "]"
 
-    ?t_call : VAR "(" args{type} ")" | t_atom
+    ?ts_call : VAR "(" args{typesig} ")" | ts_atom
 
-    t_atom : "(" type ")"
-           | VAR -> t_var
+    ts_atom : "(" typesig ")"
+           | VAR -> ts_var
 
 ?expr : e_assign
 
     ?!e_assign : e_cast (("="|"+="|"-="|"*="|"/="|"%=") e_assign)?
 
-    ?!e_cast : op_cmp ("as" type)?
+    ?!e_cast : op_cmp ("as" typesig)?
 
     ?!op_cmp : op_ord (("=="|"!=") op_cmp)?
 
@@ -52,9 +52,9 @@ lit : STR -> l_str
 
     ?simple : s_decl | s_break | s_continue | s_return | s_expr
 
-        s_decl : "var" VAR ":" type ["=" expr]
-               | "var" VAR [":" type] "=" expr 
-               | "var" VAR ":" type "=" expr
+        s_decl : "var" VAR ":" typesig ["=" expr]
+               | "var" VAR [":" typesig] "=" expr 
+               | "var" VAR ":" typesig "=" expr
 
         s_break : "break"
 
@@ -78,8 +78,8 @@ lit : STR -> l_str
 
         _var_decl : s_decl ";"
 
-    d_func : modifiers "fn" VAR "(" args{arg} ")" type s_block
+    d_func : modifiers "fn" VAR "(" args{arg} ")" typesig s_block
 
-        arg : VAR ":" type -> many
+        arg : VAR ":" typesig -> many
 
 file : many{decl}

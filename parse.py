@@ -9,8 +9,9 @@ def transform(tree):
         case lark.Tree:
             if tree.data.startswith("op_"):
                 n = "EOp"
-            elif tree.data[1] == "_":
-                n = tree.data[0].upper() + tree.data[2:].capitalize()
+            elif "_" in tree.data:
+                prefix, rest = tree.data.split("_")
+                n = prefix.upper() + rest.capitalize()
             else:
                 n = tree.data
             x = eval(n)(*map(transform, tree.children))

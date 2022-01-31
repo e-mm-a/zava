@@ -17,19 +17,16 @@ class Lit:
     LNum: [int | float]
 
 @data
-class Type:
-    TArr: ["Type"]
-    TCall: [str, ["Type"]]
-    TPrim: [str]
-    TVar: [str]
-
-    TFunc: [str, ["Type"], "Type"]
-    TCls: [str, dict[str, "Type"]]
+class TypeSig:
+    TSArr: ["TypeSig"]
+    TSCall: [str, ["TypeSig"]]
+    TSPrim: [str]
+    TSVar: [str]
 
 @data
 class Expr:
     EAssign: ["Expr", str, "Expr"]
-    ECast: ["Expr", Type]
+    ECast: ["Expr", TypeSig]
     EOp: ["Expr", str, "Expr"]
     ECall: ["Expr", ["Expr"]]
     EDot: ["Expr", str]
@@ -38,7 +35,7 @@ class Expr:
 
 @data
 class Stmt:
-    SDecl: [str, Type | None, Expr | None]
+    SDecl: [str, TypeSig | None, Expr | None]
     SBreak: []
     SContinue: []
     SReturn: [Expr | None]
@@ -51,7 +48,7 @@ class Stmt:
 @data
 class Decl:
     DClass: [[str], str, [Stmt], [0]]
-    DFunc: [[str], str, [(str, Type)], Type, Stmt]
+    DFunc: [[str], str, [(str, TypeSig)], TypeSig, Stmt]
 
 @dataclass
 class file:
