@@ -1,0 +1,85 @@
+%import common.WS
+%ignore WS
+
+%import common.ESCAPED_STRING -> STR
+%import common.SIGNED_NUMBER -> NUM
+CHAR : /'([^'\\]|\\.)'/
+
+%import common.CNAME -> VAR
+
+many{x} : x*
+
+args{x} : ((x ",")* x ","?)? -> many
+
+!modifiers : ("pub" | "static")* -> many
+
+lit : STR -> l_str
+    | CHAR -> l_char
+    | NUM -> l_num
+
+?type : t_arr | t_call
+
+    t_arr : "[" type "]"
+
+    ?t_call : VAR "(" args{type} ")" | t_atom
+
+    t_atom : "(" type ")"
+           | VAR -> t_var
+
+?expr : e_assign
+
+    ?!e_assign : e_cast (("="|"+="|"-="|"*="|"/="|"%=") e_assign)?
+
+    ?!e_cast : op_cmp ("as" type)?
+
+    ?!op_cmp : op_ord (("=="|"!=") op_cmp)?
+
+    ?!op_ord : op_term (("<"|">"|"<="|">=") op_ord)?
+
+    ?!op_term : op_factor (("+"|"-") op_term)?
+
+    ?!op_factor : e_call (("*"|"/"|"%") op_factor)?
+
+    ?e_call : e_dot ("(" args{expr} ")")?
+
+    ?e_dot : (e_call | e_atom) ("." VAR)?
+
+    ?e_atom : "(" expr ")"
+            | lit -> e_lit
+            | VAR -> e_var
+
+?stmt : (simple ";") | compound
+
+    ?simple : s_decl | s_break | s_continue | s_return | s_expr
+
+        s_decl : "var" VAR ":" type ["=" expr]
+               | "var" VAR [":" type] "=" expr 
+               | "var" VAR ":" type "=" expr
+
+        s_break : "break"
+
+        s_continue : "continue"
+
+        s_return : "return" [expr]
+
+        s_expr : expr
+
+    ?compound : s_block | s_if | s_while
+    
+        s_block : "{" many{stmt} "}"
+
+        s_if : "if" "(" expr ")" stmt ["else" stmt]
+
+        s_while : "while" "(" expr ")" [":" "(" expr ")"] stmt
+ 
+?decl : d_class
+
+    d_class : modifiers "class" VAR "{" many{_var_decl} many{d_func} "}"
+
+        _var_decl : s_decl ";"
+
+    d_func : modifiers "fn" VAR "(" args{arg} ")" type s_block
+
+        arg : VAR ":" type -> many
+
+file : many{decl}

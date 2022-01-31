@@ -1,0 +1,11 @@
+#!/bin/python
+
+import sys
+from pprint import pprint
+import parse
+
+with open(sys.argv[1], "r") as f:
+    src = f.read()
+
+ast = parse.parse(src)
+pprint(ast)
