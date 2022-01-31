@@ -7,7 +7,7 @@ def data(cls):
         setattr(cls, k, d)
     return cls
 
-def many(*x):
+def Many(*x):
     return x
 
 @data
@@ -47,9 +47,15 @@ class Stmt:
 
 @data
 class Decl:
-    DClass: [[str], str, [Stmt], [0]]
+    DDecl: [str, TypeSig | None, Expr | None]
     DFunc: [[str], str, [(str, TypeSig)], TypeSig, Stmt]
 
 @dataclass
-class file:
+class Class:
+    modifiers: [str]
+    name: str
     decls: [Decl]
+
+@dataclass
+class File:
+    classes: [Class]

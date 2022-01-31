@@ -13,7 +13,7 @@ def transform(tree):
                 prefix, rest = tree.data.split("_")
                 n = prefix.upper() + rest.capitalize()
             else:
-                n = tree.data
+                n = tree.data.capitalize()
             x = eval(n)(*map(transform, tree.children))
             try: x.loc = tree.meta
             except AttributeError: ...

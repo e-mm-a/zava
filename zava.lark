@@ -11,7 +11,11 @@ many{x} : x*
 
 args{x} : ((x ",")* x ","?)? -> many
 
-!modifiers : ("pub" | "static")* -> many
+!modifiers : "pub"? "static"? -> many
+
+_decl : "var" VAR ":" typesig ["=" expr]
+      | "var" VAR [":" typesig] "=" expr
+      | "var" VAR ":" typesig "=" expr
 
 lit : STR -> l_str
     | CHAR -> l_char
@@ -52,9 +56,7 @@ lit : STR -> l_str
 
     ?simple : s_decl | s_break | s_continue | s_return | s_expr
 
-        s_decl : "var" VAR ":" typesig ["=" expr]
-               | "var" VAR [":" typesig] "=" expr 
-               | "var" VAR ":" typesig "=" expr
+        s_decl : _decl
 
         s_break : "break"
 
@@ -72,14 +74,14 @@ lit : STR -> l_str
 
         s_while : "while" "(" expr ")" [":" "(" expr ")"] stmt
  
-?decl : d_class
+?decl : d_decl | d_func
 
-    d_class : modifiers "class" VAR "{" many{_var_decl} many{d_func} "}"
-
-        _var_decl : s_decl ";"
+    d_decl : _decl ";"
 
     d_func : modifiers "fn" VAR "(" args{arg} ")" typesig s_block
 
         arg : VAR ":" typesig -> many
 
-file : many{decl}
+class : modifiers "class" VAR "{" many{decl} "}"
+
+file : many{class}
