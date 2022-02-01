@@ -193,7 +193,6 @@ class Check:
             case ECall(fn, args):
                 match self.check(fn):
                     case TFunc(params, ret):
-                        args = []
                         for p, a in zip(params, args):
                             self.has_type(a, p)
                         return ret
