@@ -203,7 +203,7 @@ class Check:
                 self.check_var_decl(name, type, value, self.cls.env)
             case DClass(mod, name, body):
                 self.cls = TCls(name, {})
-                body = list(body)
+                b = list(body)
                 for i, d in enumerate(body):
                     match d:
                         case DClass():
@@ -217,14 +217,16 @@ class Check:
                                     ts.append(self.check(t))
                                 except CheckError as e:
                                     self.errors.append(e)
-                                    body.pop(i)
+                                    b.pop(i)
                             self.cls.env[name] = Type.Func(ts[:-1], ts[-1])
-                for d in body:
+                for d in b:
                     with self.gather_errors():
                         self.check(d)
                 self.classes[name] = self.cls
             case DFunc(mod, name, args, ret, body):
                 assert name in self.cls.env
+                if body == ";":
+                    return
                 with self.new_scope():
                     for a, t in args:
                         with self.gather_errors(): 

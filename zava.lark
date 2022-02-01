@@ -80,8 +80,10 @@ lit : STR -> l_str
 
     d_class : modifiers "class" VAR "{" many{decl} "}"
 
-    d_func : modifiers "fn" VAR "(" args{arg} ")" typesig s_block
+    d_func : modifiers "fn" VAR "(" args{arg} ")" typesig _body
 
         arg : VAR ":" typesig -> many
+
+        !_body : s_block | ";"
 
 file : many{d_class}
