@@ -1,8 +1,15 @@
 pub class Main {
     pub static fn main(args: [String]) void {
-        var i = 10;
+        var i = Test.ten();
         while (i > 0) : (i -= 1) {
             System.out.println("Hello, Zava!");
         }
     }
+
+    class Test {
+        fn zero() i32 {
+            return 10;
+        }
+    }
 }
+

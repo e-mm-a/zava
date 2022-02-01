@@ -74,14 +74,14 @@ lit : STR -> l_str
 
         s_while : "while" "(" expr ")" [":" "(" expr ")"] stmt
  
-?decl : d_decl | d_func
+?decl : d_decl | d_class | d_func
 
     d_decl : _decl ";"
+
+    d_class : modifiers "class" VAR "{" many{decl} "}"
 
     d_func : modifiers "fn" VAR "(" args{arg} ")" typesig s_block
 
         arg : VAR ":" typesig -> many
 
-class : modifiers "class" VAR "{" many{decl} "}"
-
-file : many{class}
+file : many{d_class}

@@ -201,9 +201,30 @@ class Check:
         match decl:
             case DDecl(name, type, value):
                 self.check_var_decl(name, type, value, self.cls.env)
+            case DClass(mod, name, body):
+                self.cls = TCls(name, {})
+                body = list(body)
+                for i, d in enumerate(body):
+                    match d:
+                        case DClass():
+                            with self.gather_errors():
+                                self.check_decl(d)
+                            b.pop(i)
+                        case DFunc(_, name, args, ret, _):
+                            ts = []
+                            for t in [a[1] for a in args] + [ret]:
+                                try:
+                                    ts.append(self.check(t))
+                                except CheckError as e:
+                                    self.errors.append(e)
+                                    body.pop(i)
+                            self.cls.env[name] = Type.Func(ts[:-1], ts[-1])
+                for d in body:
+                    with self.gather_errors():
+                        self.check(d)
+                self.classes[name] = self.cls
             case DFunc(mod, name, args, ret, body):
-                if name in self.cls.env:
-                    raise CheckError(f"Cannot redefine existing function '{name}'", decl.loc)
+                assert name in self.cls.env
                 with self.new_scope():
                     for a, t in args:
                         with self.gather_errors(): 
@@ -229,15 +250,9 @@ class Check:
             case _:
                 raise UserWarning(ast)
 
-    def check_class(self, cls):
-        self.cls = TCls(cls.name, {})
-        for d in cls.decls:
-            self.check(d)
-        self.classes[cls.name] = self.cls
-
     def check_file(self, file):
-        for cls in file.classes:
-            self.check_class(cls)
+        for cls in file.decls:
+            self.check(cls)
 
         if self.errors:
             print(self.format_errors())

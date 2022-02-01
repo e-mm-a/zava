@@ -52,14 +52,9 @@ class Stmt:
 @data
 class Decl:
     DDecl: [str, TypeSig | None, Expr | None]
+    DClass: [[str], str, ["Decl"]]
     DFunc: [[str], str, [(str, TypeSig)], TypeSig, Stmt]
 
 @dataclass
-class Class:
-    modifiers: [str]
-    name: str
-    decls: [Decl]
-
-@dataclass
 class File:
-    classes: [Class]
+    decls: [Decl]
