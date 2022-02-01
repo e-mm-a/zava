@@ -1,12 +1,14 @@
 
 pub class Main {
-    pub static fn main(args: [String]) void {
-        System.out.println("Hello, Zava!");
-        var i = 10;
+    static fn factorial(n: i32) i32 {
         var total = 1;
-        while (i > 0) : (i -= 1) {
-            total *= i as i64;
+        while (n > 0) : (n -= 1) {
+            total *= n;
         }
-        System.out.println(Integer.toString(total));
+        return total;
+    }
+
+    pub static fn main(args: [String]) void {
+        System.out.println("Factorial 10 = " + factorial(10));
     }
 }

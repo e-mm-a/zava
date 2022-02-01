@@ -1,15 +1,17 @@
 #!/bin/python
 
-import sys
+import sys, os
 from pprint import pprint
 import parse
 import check
 import codegen
 
-path = sys.argv[1]
+
+def usage() -> None:
+    print(f"Usage: zava [run|build] <file.zava>")
 
 
-def gen(path, c):
+def gen(path: str, c: check.Check) -> str:
     with open(path, "r") as f:
         src = f.read()
 
@@ -20,4 +22,21 @@ def gen(path, c):
 
 c = check.Check()
 gen("example/Header.zava", c)
-print(gen(path, c))
+
+match sys.argv:
+    case (_, cmd, file):
+        java = gen(file, c)
+        if cmd == "build":
+            with open(os.path.splitext(file)[0] + ".java", "w") as f:
+                f.write(java)
+        elif cmd == "run":
+            # TODO: Using os.system here is hacky and unsafe!
+            # Replace it with Subprocess when I rewrite this file.
+            name = os.path.splitext(os.path.basename(file))[0]
+            with open("/tmp/" + name + ".java", "w") as f:
+                f.write(java)
+            os.system(f"cd /tmp && javac {name}.java && java {name}")
+        else:
+            usage()
+    case _:
+        usage()
