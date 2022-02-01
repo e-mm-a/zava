@@ -68,7 +68,7 @@ class ECast(Expr):
 @dataclass
 class EOp(Expr):
     lhs: Expr
-    op: Expr
+    op: str
     rhs: Expr
 
 

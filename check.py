@@ -226,8 +226,13 @@ class Check:
 
     def _check_expr_impl(self, expr: Expr) -> Type:
         match expr:
-            case EAssign(lhs, _, rhs):
-                return self.has_type(rhs, self.check(lhs))
+            case EAssign(lhs, op, rhs):
+                l = self.check(lhs)
+                if op == "=":
+                    r = rhs
+                else:
+                    r = EOp(lhs, op[0], rhs)
+                return self.has_type(rhs, l)
             case ECast(target, sig):
                 self.check(target)
                 return self.check(sig)
@@ -248,7 +253,9 @@ class Check:
                     and tr in arith
                 )
                 valid_other = op in ("==", "!=") and tl in other and tr in other
-                if valid_str or valid_arith or valid_other:
+                if valid_str:
+                    return string
+                if valid_arith or valid_other:
                     if op in ("==", "!=", "<", ">", "<=", ">="):
                         return t_bool
                     else:
