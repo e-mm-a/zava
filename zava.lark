@@ -13,13 +13,13 @@ args{x} : ((x ",")* x ","?)? -> many
 
 !modifiers : "pub"? "static"? -> many
 
-_decl : "var" VAR ":" typesig ["=" expr]
-      | "var" VAR [":" typesig] "=" expr
-      | "var" VAR ":" typesig "=" expr
-
 lit : STR -> l_str
     | CHAR -> l_char
     | NUM -> l_num
+
+var_decl : "var" VAR ":" typesig ["=" expr]
+         | "var" VAR [":" typesig] "=" expr
+         | "var" VAR ":" typesig "=" expr
 
 ?typesig : ts_arr | ts_call
 
@@ -56,7 +56,7 @@ lit : STR -> l_str
 
     ?simple : s_decl | s_break | s_continue | s_return | s_expr
 
-        s_decl : _decl
+        s_decl : var_decl
 
         s_break : "break"
 
@@ -76,7 +76,7 @@ lit : STR -> l_str
  
 ?decl : d_decl | d_class | d_func
 
-    d_decl : _decl ";"
+    d_decl : var_decl ";"
 
     d_class : modifiers "class" VAR "{" many{decl} "}"
 

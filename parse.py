@@ -9,11 +9,8 @@ def transform(tree):
         case lark.Tree:
             if tree.data.startswith("op_"):
                 n = "EOp"
-            elif "_" in tree.data:
-                prefix, rest = tree.data.split("_")
-                n = prefix.upper() + rest.capitalize()
             else:
-                n = tree.data.capitalize()
+                n = "".join(t.capitalize() for t in tree.data.split("_"))
             x = eval(n)(*map(transform, tree.children))
             try: x.loc = tree.meta
             except AttributeError: ...

@@ -2,28 +2,40 @@ from dataclasses import dataclass
 from contextlib import contextmanager
 from syntax import *
 
-@data
 class Type:
-    Arr: ["Type"]
-    Call: [str, ["Type"]]
-    Prim: [str]
-    Func: [["Type"], "Type"]
-
     def __repr__(self):
         match self:
-            case Type.Arr(t):
+            case TArr(t):
                 return f"[{t}]"
-            case Type.Call(t, ts):
+            case TCall(t, ts):
                 return f"{t}(" + ", ".join(map(repr, ts)) + ")"
-            case Type.Prim(name):
+            case TPrim(name):
                 return name
-            case Type.Func(ts, t):
+            case TFunc(ts, t):
                 return "(" + ", ".join(map(repr, ts)) + f") -> {t}"
-            case TCls(name, _):
+            case TClass(name, _):
                 return name
 
 @dataclass(repr=False)
-class TCls(Type):
+class TArr(Type):
+    contains: Type
+
+@dataclass(repr=False)
+class TCall(Type):
+    name: str
+    args: list[Type]
+
+@dataclass(repr=False)
+class TPrim(Type):
+    name: str
+
+@dataclass(repr=False)
+class TFunc(Type):
+    args: list[Type]
+    ret: Type
+
+@dataclass(repr=False)
+class TClass(Type):
     name: str
     env: dict[str, Type]
 
@@ -80,37 +92,37 @@ class Check:
             raise CheckError(f"Expected type '{type}' but found '{t}'", ast.loc)
         return t
 
-    def check_var_decl(self, name, type, value, env):
-        if name in env:
-            raise CheckError(f"Cannot redeclare existing variable '{name}'", name.loc)
-        if type:
-            t = self.has_type(value, self.check(type))
+    def check_var_decl(self, decl, env):
+        if decl.name in env:
+            raise CheckError(f"Cannot redeclare existing variable '{decl.name}'", name.loc)
+        if decl.sig:
+            t = self.has_type(decl.value, self.check(decl.sig))
         else:
-            t = self.check(value)
-        env[name] = t
+            t = self.check(decl.value)
+        env[decl.name] = t
 
     def check_lit(self, lit):
         match lit:
             case LStr(_):
                 return self.classes["String"]
             case LChar(_):
-                return Type.Prim("char")
+                return TPrim("char")
             case LNum(n):
                 try:
                     int(n)
-                    return Type.Prim("i32")
+                    return TPrim("i32")
                 except ValueError:
-                    return Type.Prim("f32")
+                    return TPrim("f32")
             case _:
                 raise UserWarning(lit)
 
     def check_typesig(self, typesig):
         match typesig:
-            case TSArr(t):
-                return Type.Arr(self.check(t))
-            case TSCall(t, ts):
-                return Type.Call(self.check(t), [self.check(t) for t in ts])
-            case TSVar(name):
+            case TsArr(t):
+                return TArr(self.check(t))
+            case TsCall(t, ts):
+                return TCall(self.check(t), [self.check(t) for t in ts])
+            case TsVar(name):
                 prims = (
                     "i8", "i16", "i32", "i64",
                     "f32", "f64",
@@ -118,7 +130,7 @@ class Check:
                     "void",
                 )
                 if name in prims:
-                    return Type.Prim(name)
+                    return TPrim(name)
 
                 for c_env in self.classes:
                     if name in c_env:
@@ -136,17 +148,17 @@ class Check:
         match expr:
             case EAssign(lhs, _, rhs):
                 return self.has_type(rhs, self.check(lhs))
-            case ECast(target, type):
+            case ECast(target, sig):
                 self.check(target)
-                return self.check(type)
+                return self.check(sig)
             case EOp(lhs, op, rhs):
                 t = self.has_type(rhs, self.check(lhs))
                 if op in ("==", "!=", "<", ">", "<=", ">="):
-                    t = Type.Prim("bool")
+                    t = TPrim("bool")
                 return t
             case ECall(fn, args):
                 match self.check(fn):
-                    case Type.Func(params, ret):
+                    case TFunc(params, ret):
                         args = []
                         for p, a in zip(params, args):
                             self.has_type(a, p)
@@ -155,7 +167,7 @@ class Check:
                         raise CheckError(f"Cannot call non-function type '{t}'", fn.loc)
             case EDot(target, attr):
                 match self.check(target):
-                    case TCls(n, env) if attr in env:
+                    case TClass(n, env) if attr in env:
                         return env[attr]
                     case t:
                         raise CheckError(f"Type '{t}' has no attribute '{attr}'", target.loc)
@@ -171,8 +183,8 @@ class Check:
 
     def check_stmt(self, stmt):
         match stmt:
-            case SDecl(name, type, value):
-                self.check_var_decl(name, type, value, self.envs[-1])
+            case SDecl(var_decl):
+                self.check_var_decl(var_decl, self.envs[-1])
             case SBreak() | SContinue():
                 ...
             case SReturn(value):
@@ -186,12 +198,12 @@ class Check:
                         for s in stmts:
                             self.check(s)
             case SIf(cond, body, orelse):
-                self.has_type(cond, Type.Prim("bool"))
+                self.has_type(cond, TPrim("bool"))
                 self.check(body)
                 if orelse:
                     self.check(orelse)
             case SWhile(cond, step, body):
-                self.has_type(cond, Type.Prim("bool"))
+                self.has_type(cond, TPrim("bool"))
                 if step:
                     self.check(step)
                 self.check(body)
@@ -200,12 +212,12 @@ class Check:
 
     def check_decl(self, decl):
         match decl:
-            case DDecl(name, type, value):
-                self.check_var_decl(name, type, value, self.classes[-1])
+            case DDecl(var_decl):
+                self.check_var_decl(var_decl, self.classes[-1])
             case DClass(mod, name, body):
                 c_env = {}
                 before = self.cls
-                self.cls = TCls(name, c_env)
+                self.cls = TClass(name, c_env)
                 self.classes.append(c_env)
 
                 cs = list(filter(lambda d: isinstance(d, DClass), body))
@@ -217,12 +229,11 @@ class Check:
                 for d in ds:
                     self.check_var_decl(d)
                 for f in fs:
-                    n, args, ret = f.u1, f.u2, f.u3
                     ts = []
-                    for t in [a[1] for a in args] + [ret]:
+                    for t in [a[1] for a in f.args] + [f.ret]:
                         with self.gather_errors():
                             ts.append(self.check(t))
-                    self.classes[-1][n] = Type.Func(ts[:-1], ts[-1])
+                    self.classes[-1][f.name] = TFunc(ts[:-1], ts[-1])
                 for f in fs:
                     self.check_decl(f)
 
@@ -240,7 +251,7 @@ class Check:
                     with self.gather_errors():
                         self.ret = self.check(ret)
                     with self.gather_errors():
-                        for s in body.u0:
+                        for s in body.stmts:
                             self.check(s)
 
     def check(self, ast):

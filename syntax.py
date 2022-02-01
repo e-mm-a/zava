@@ -1,60 +1,132 @@
-from dataclasses import dataclass, make_dataclass
-
-def data(cls):
-    for k, v in cls.__annotations__.items():
-        d = make_dataclass(
-            k,
-            [(f"u{i}", v) for i, v in enumerate(v)],
-            bases=(cls,),
-            repr=False,
-        )
-        globals()[k] = d
-        setattr(cls, k, d)
-    return cls
+from dataclasses import dataclass
 
 def Many(*x):
     return x
 
-@data
+@dataclass
 class Lit:
-    LStr: [str]
-    LChar: [str]
-    LNum: [int | float]
+    value: str
 
-@data
-class TypeSig:
-    TSArr: ["TypeSig"]
-    TSCall: [str, ["TypeSig"]]
-    TSVar: [str]
+class LStr(Lit): ...
+class LChar(Lit): ...
+class LNum(Lit): ...
 
-@data
-class Expr:
-    EAssign: ["Expr", str, "Expr"]
-    ECast: ["Expr", TypeSig]
-    EOp: ["Expr", str, "Expr"]
-    ECall: ["Expr", ["Expr"]]
-    EDot: ["Expr", str]
-    ELit: [Lit]
-    EVar: [str]
+class TypeSig: ...
 
-@data
-class Stmt:
-    SDecl: [str, TypeSig | None, Expr | None]
-    SBreak: []
-    SContinue: []
-    SReturn: [Expr | None]
-    SExpr: [Expr]
+@dataclass
+class TsArr(TypeSig):
+    contains: TypeSig
 
-    SBlock: [["Stmt"]]
-    SIf: [Expr, "Stmt", "Stmt"]
-    SWhile: [Expr, Expr | None, "Stmt"]
+@dataclass
+class TsCall(TypeSig):
+    name: str
+    args: list[TypeSig]
 
-@data
-class Decl:
-    DDecl: [str, TypeSig | None, Expr | None]
-    DClass: [[str], str, ["Decl"]]
-    DFunc: [[str], str, [(str, TypeSig)], TypeSig, Stmt]
+@dataclass
+class TsVar(TypeSig):
+    name: str
+
+class Expr: ...
+
+@dataclass
+class EAssign(Expr):
+    lvalue: Expr
+    op: str
+    value: Expr
+
+@dataclass
+class ECast(Expr):
+    target: Expr
+    sig: TypeSig
+
+@dataclass
+class EOp(Expr):
+    lhs: Expr
+    op: Expr
+    rhs: Expr
+
+@dataclass
+class ECall(Expr):
+    target: Expr
+    args: list[Expr]
+
+@dataclass
+class EDot(Expr):
+    target: Expr
+    attr: str
+
+@dataclass
+class ELit(Expr):
+    lit: Lit
+
+@dataclass
+class EVar(Expr):
+    name: str
+
+@dataclass
+class VarDecl:
+    name: str
+    sig: TypeSig | None
+    value: Expr | None
+
+class Stmt: ...
+
+@dataclass
+class SDecl(Stmt):
+    decl: VarDecl
+
+@dataclass
+class SBreak(Stmt):
+    ...
+
+@dataclass
+class SContinue(Stmt):
+    ...
+
+@dataclass
+class SReturn(Stmt):
+    value: Expr | None
+
+@dataclass
+class SExpr(Stmt):
+    expr: Expr
+
+@dataclass
+class SBlock(Stmt):
+    stmts: list[Stmt]
+
+@dataclass
+class SIf(Stmt):
+    cond: Expr
+    body: Stmt
+    orelse: Stmt | None
+
+@dataclass
+class SWhile(Stmt):
+    cond: Expr
+    step: Expr | None
+    body: Stmt
+
+class Decl: ...
+
+@dataclass
+class DDecl(Decl):
+    decl: VarDecl
+
+@dataclass
+class DFunc(Decl):
+    modifiers: list[str]
+    name: str
+    args: list[tuple[str, TypeSig]]
+    ret: TypeSig
+    body: Stmt
+
+@dataclass
+class DClass(Decl):
+    modifiers: list[str]
+    name: str
+    body: list[Decl]
 
 @dataclass
 class File:
-    decls: [Decl]
+    decls: list[Decl]
