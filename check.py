@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from typing import cast, overload, Iterator, Union
 from contextlib import contextmanager
+import os
+from colorama import Fore, Style
 from syntax import *
+
+RED = Fore.RED
+YELLOW = Fore.YELLOW
+BLUE = Fore.BLUE
+
+R = Style.RESET_ALL
 
 
 class Type:
@@ -12,11 +20,11 @@ class Type:
             case TCall(t, ts):
                 return f"{t}(" + ", ".join(map(repr, ts)) + ")"
             case TPrim(name):
-                return name
+                return BLUE + name + R
             case TFunc(ts, t):
                 return "(" + ", ".join(map(repr, ts)) + f") -> {t}"
             case TClass(name, _):
-                return name
+                return YELLOW + name + R
 
 
 @dataclass(repr=False)
@@ -122,19 +130,29 @@ class Check:
         out = []
         for err in self.errors:
             msg, loc = err.args
+            file = os.path.basename(self.filename)
+
             gap = " " * (len(str(loc.line)) + 1)
-            line = self.src[loc.line - 1]
-            arrow = " " * (loc.column - 1) + "^" * (loc.end_column - loc.column)
+            raw_line = self.src[loc.line - 1]
+            line = raw_line.lstrip()
+            diff = len(raw_line) - len(line)
+
+            col = loc.column - 1 - diff
+            e_col = loc.end_column - 1 - diff
+
+            before = line[:col]
+            err = line[col:e_col]
+            after = line[e_col:]
+            arrow = " " * col + "^" * (e_col - col)
 
             out.append(
-                f"{self.filename}:{loc.line}:{loc.column}:\n"
+                f"{file}:{loc.line}:{loc.column}:\n"
                 + f"{gap}|\n"
-                + f"{loc.line} | {line}\n"
-                + f"{gap}| "
-                + arrow
-                + "\n"
-                + msg
+                + f"{loc.line} | {before}{RED}{err}{R}{after}\n"
+                + f"{gap}| {RED}{arrow}{R}\n"
+                + f"{RED}error:{R} {msg}"
             )
+
         return "\n\n".join(out)
 
     def upcast(self, t1: Type, t2: Type) -> Type | None:
