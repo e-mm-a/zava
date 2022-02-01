@@ -41,10 +41,16 @@ class TFunc(Type):
     ret: Type
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class TClass(Type):
     name: str
     env: dict[str, Type]
+
+    def __eq__(self, other: object) -> bool:
+        match other:
+            case TClass(name, _):
+                return self.name == name
+        return False
 
 
 t_bool = TPrim("bool")
@@ -107,11 +113,48 @@ class Check:
             )
         return "\n\n".join(out)
 
-    def has_type(self, ast: Lit | Expr | TypeSig | Stmt | Decl, type: Type) -> Type:
+    def upcast(self, t1: Type, t2: Type) -> Type | None:
+
+        Cast = list[tuple[Type, ...]]
+
+        int_cast: Cast = [
+            (TPrim("i8"), TClass("Byte", {})),
+            (TPrim("i16"), TClass("Short", {})),
+            (TPrim("i32"), TClass("Integer", {})),
+            (TPrim("i64"), TClass("Long", {})),
+        ]
+        float_cast: Cast = [
+            (TPrim("f32"), TClass("Float", {})),
+            (TPrim("f64"), TClass("Double", {})),
+        ]
+
+        def idx(t: Type, ts: list[tuple[Type, ...]]) -> int | None:
+            for i, group in enumerate(ts):
+                if t in group:
+                    return i
+            return None
+
+        if t1 == t2:
+            return t1
+
+        for cast in (int_cast, float_cast):
+            i = idx(t1, cast)
+            j = idx(t2, cast)
+            if i is not None and j is not None:
+                if i >= j:
+                    return t1
+                else:
+                    return t2
+
+        return None
+
+    def has_type(self, ast: Lit | Expr | TypeSig, type: Type) -> Type:
         t = self.check(ast)
-        if t != type:
+        out = self.upcast(t, type)
+        if out:
+            return out
+        else:
             raise CheckError(f"Expected type '{type}' but found '{t}'", ast.loc)
-        return t
 
     def check_var_decl(self, decl: VarDecl, env: Env) -> None:
         if decl.name in env:
@@ -186,10 +229,47 @@ class Check:
                 self.check(target)
                 return self.check(sig)
             case EOp(lhs, op, rhs):
-                t = self.has_type(rhs, self.check(lhs))
-                if op in ("==", "!=", "<", ">", "<=", ">="):
-                    t = t_bool
-                return t
+                tl = self.check(lhs)
+                tr = self.check(rhs)
+                arith = tuple(
+                    TPrim(t) for t in ("i8", "i16", "i32", "i64", "f32", "f64")
+                ) + tuple(
+                    TClass(t, {})
+                    for t in (
+                        "Byte",
+                        "Short",
+                        "Integer",
+                        "Long",
+                        "Float",
+                        "Double",
+                        "Character",
+                    )
+                )
+                other = arith + (
+                    tuple(TPrim(t) for t in ("char", "void")) + (TClass("Boolean", {}),)
+                )
+                string = TClass("String", {})
+                valid_str = (
+                    op == "+"
+                    and (tl == string or tr == string)
+                    and (tl in arith or tr in arith)
+                )
+                valid_arith = (
+                    op in ("+", "-", "*", "/", "%", "<", ">", "<=", ">=")
+                    and tl in arith
+                    and tr in arith
+                )
+                valid_other = op in ("==", "!=") and tl in other and tr in other
+                if valid_str or valid_arith or valid_other:
+                    if op in ("==", "!=", "<", ">", "<=", ">="):
+                        return t_bool
+                    else:
+                        return cast(Type, self.upcast(tl, tr))
+                else:
+                    raise CheckError(
+                        f"Unexpected types '{tl}' and '{tr}' to binary operand {op}",
+                        expr.loc,
+                    )
             case ECall(fn, args):
                 match self.check(fn):
                     case TFunc(params, ret):
