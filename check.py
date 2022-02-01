@@ -22,7 +22,7 @@ class Type:
             case TCls(name, _):
                 return name
 
-@dataclass
+@dataclass(repr=False)
 class TCls(Type):
     name: str
     env: dict[str, Type]
@@ -35,7 +35,7 @@ class Check:
     envs = []
     ret = None
     
-    classes = {}
+    classes = [{}]
     cls = None
 
     errors = []
@@ -119,10 +119,11 @@ class Check:
                 )
                 if name in prims:
                     return Type.Prim(name)
-                elif name in self.classes:
-                    return self.classes[name]
-                else:
-                    raise CheckError(f"Unbound type '{name}'", typesig.loc)
+
+                for c_env in self.classes:
+                    if name in c_env:
+                        return c_env[name]
+                raise CheckError(f"Unbound type '{name}'", typesig.loc)
             case _:
                 raise UserWarning(typesig)
 
@@ -149,19 +150,19 @@ class Check:
                         args = []
                         for p, a in zip(params, args):
                             self.has_type(a, p)
-                        return self.check(ret)
+                        return ret
                     case t:
                         raise CheckError(f"Cannot call non-function type '{t}'", fn.loc)
             case EDot(target, attr):
                 match self.check(target):
-                    case TCls(env) if attr in env:
+                    case TCls(n, env) if attr in env:
                         return env[attr]
                     case t:
                         raise CheckError(f"Type '{t}' has no attribute '{attr}'", target.loc)
             case ELit(lit):
                 return self.check(lit)
             case EVar(name):
-                for e in self.envs:
+                for e in self.envs + self.classes:
                     if name in e:
                         return e[name]
                 raise CheckError(f"Unbound symbol '{name}'", expr.loc)
@@ -200,31 +201,36 @@ class Check:
     def check_decl(self, decl):
         match decl:
             case DDecl(name, type, value):
-                self.check_var_decl(name, type, value, self.cls.env)
+                self.check_var_decl(name, type, value, self.classes[-1])
             case DClass(mod, name, body):
-                self.cls = TCls(name, {})
-                b = list(body)
-                for i, d in enumerate(body):
-                    match d:
-                        case DClass():
-                            with self.gather_errors():
-                                self.check_decl(d)
-                            b.pop(i)
-                        case DFunc(_, name, args, ret, _):
-                            ts = []
-                            for t in [a[1] for a in args] + [ret]:
-                                try:
-                                    ts.append(self.check(t))
-                                except CheckError as e:
-                                    self.errors.append(e)
-                                    b.pop(i)
-                            self.cls.env[name] = Type.Func(ts[:-1], ts[-1])
-                for d in b:
-                    with self.gather_errors():
-                        self.check(d)
-                self.classes[name] = self.cls
+                c_env = {}
+                before = self.cls
+                self.cls = TCls(name, c_env)
+                self.classes.append(c_env)
+
+                cs = list(filter(lambda d: isinstance(d, DClass), body))
+                ds = list(filter(lambda d: isinstance(d, DDecl), body))
+                fs = list(filter(lambda d: isinstance(d, DFunc), body))
+
+                for c in cs:
+                    self.check_decl(c)
+                for d in ds:
+                    self.check_var_decl(d)
+                for f in fs:
+                    n, args, ret = f.u1, f.u2, f.u3
+                    ts = []
+                    for t in [a[1] for a in args] + [ret]:
+                        with self.gather_errors():
+                            ts.append(self.check(t))
+                    self.classes[-1][n] = Type.Func(ts[:-1], ts[-1])
+                for f in fs:
+                    self.check_decl(f)
+
+                self.classes.pop()
+                self.classes[-1][name] = self.cls
+                self.cls = before
             case DFunc(mod, name, args, ret, body):
-                assert name in self.cls.env
+                assert name in self.classes[-1]
                 if body == ";":
                     return
                 with self.new_scope():
