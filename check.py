@@ -178,10 +178,13 @@ class Check:
 
         return None
 
-    def has_type(self, ast: Lit | Expr | TypeSig, type: Type) -> Type:
+    def has_type(
+        self, ast: Lit | Expr | TypeSig, type: Type, strict: bool = False
+    ) -> Type:
         t = self.check(ast)
-        out = self.upcast(t, type)
-        if out:
+        if strict and t == type:
+            return t
+        elif not strict and (out := self.upcast(t, type)) and out:
             return out
         else:
             raise CheckError(f"Expected type '{type}' but found '{t}'", ast.loc)
@@ -250,7 +253,7 @@ class Check:
                     r = rhs
                 else:
                     r = EOp(lhs, op[0], rhs)
-                return self.has_type(rhs, l)
+                return self.has_type(rhs, l, True)
             case ECast(target, sig):
                 self.check(target)
                 return self.check(sig)
