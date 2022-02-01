@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from contextlib import contextmanager
 from syntax import *
 
+
 class Type:
     def __repr__(self):
         match self:
@@ -16,37 +17,44 @@ class Type:
             case TClass(name, _):
                 return name
 
+
 @dataclass(repr=False)
 class TArr(Type):
     contains: Type
+
 
 @dataclass(repr=False)
 class TCall(Type):
     name: str
     args: list[Type]
 
+
 @dataclass(repr=False)
 class TPrim(Type):
     name: str
+
 
 @dataclass(repr=False)
 class TFunc(Type):
     args: list[Type]
     ret: Type
 
+
 @dataclass(repr=False)
 class TClass(Type):
     name: str
     env: dict[str, Type]
 
+
 class CheckError(Exception):
     ...
+
 
 class Check:
 
     envs = []
     ret = None
-    
+
     classes = [{}]
     cls = None
 
@@ -73,16 +81,18 @@ class Check:
         out = []
         for err in self.errors:
             msg, loc = err.args
-            gap = " "*(len(str(loc.line)) + 1)
+            gap = " " * (len(str(loc.line)) + 1)
             line = self.src[loc.line - 1]
-            arrow = " "*(loc.column-1) + "^"*(loc.end_column-loc.column)
+            arrow = " " * (loc.column - 1) + "^" * (loc.end_column - loc.column)
 
             out.append(
-                f"{self.filename}:{loc.line}:{loc.column}:\n" +
-                f"{gap}|\n" +
-                f"{loc.line} | {line}\n" +
-                f"{gap}| " + arrow + "\n" +
-                msg
+                f"{self.filename}:{loc.line}:{loc.column}:\n"
+                + f"{gap}|\n"
+                + f"{loc.line} | {line}\n"
+                + f"{gap}| "
+                + arrow
+                + "\n"
+                + msg
             )
         return "\n\n".join(out)
 
@@ -94,7 +104,9 @@ class Check:
 
     def check_var_decl(self, decl, env):
         if decl.name in env:
-            raise CheckError(f"Cannot redeclare existing variable '{decl.name}'", name.loc)
+            raise CheckError(
+                f"Cannot redeclare existing variable '{decl.name}'", name.loc
+            )
         if decl.sig:
             t = self.has_type(decl.value, self.check(decl.sig))
         else:
@@ -124,8 +136,12 @@ class Check:
                 return TCall(self.check(t), [self.check(t) for t in ts])
             case TsVar(name):
                 prims = (
-                    "i8", "i16", "i32", "i64",
-                    "f32", "f64",
+                    "i8",
+                    "i16",
+                    "i32",
+                    "i64",
+                    "f32",
+                    "f64",
                     "char",
                     "void",
                 )
@@ -170,7 +186,9 @@ class Check:
                     case TClass(n, env) if attr in env:
                         return env[attr]
                     case t:
-                        raise CheckError(f"Type '{t}' has no attribute '{attr}'", target.loc)
+                        raise CheckError(
+                            f"Type '{t}' has no attribute '{attr}'", target.loc
+                        )
             case ELit(lit):
                 return self.check(lit)
             case EVar(name):
@@ -246,7 +264,7 @@ class Check:
                     return
                 with self.new_scope():
                     for a, t in args:
-                        with self.gather_errors(): 
+                        with self.gather_errors():
                             self.envs[-1][a] = self.check(t)
                     with self.gather_errors():
                         self.ret = self.check(ret)
@@ -263,7 +281,7 @@ class Check:
             case Expr():
                 return self.check_expr(ast)
             case Stmt():
-                 self.check_stmt(ast)
+                self.check_stmt(ast)
             case Decl():
                 self.check_decl(ast)
             case _:
