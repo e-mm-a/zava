@@ -24,5 +24,5 @@ def transform(tree):
             return tree
 
 
-def parse(src):
+def parse(src: str) -> File:
     return transform(parser.parse(src))

@@ -1,12 +1,18 @@
 from dataclasses import dataclass
+from typing import Any
+from lark.tree import Meta
 
 
 def Many(*x):
     return x
 
 
+class AST:
+    loc: Meta
+
+
 @dataclass
-class Lit:
+class Lit(AST):
     value: str
 
 
@@ -22,7 +28,7 @@ class LNum(Lit):
     ...
 
 
-class TypeSig:
+class TypeSig(AST):
     ...
 
 
@@ -42,8 +48,8 @@ class TsVar(TypeSig):
     name: str
 
 
-class Expr:
-    ...
+class Expr(AST):
+    annot: Any
 
 
 @dataclass
@@ -89,13 +95,13 @@ class EVar(Expr):
 
 
 @dataclass
-class VarDecl:
+class VarDecl(AST):
     name: str
     sig: TypeSig | None
     value: Expr | None
 
 
-class Stmt:
+class Stmt(AST):
     ...
 
 
@@ -143,7 +149,7 @@ class SWhile(Stmt):
     body: Stmt
 
 
-class Decl:
+class Decl(AST):
     ...
 
 
@@ -158,7 +164,7 @@ class DFunc(Decl):
     name: str
     args: list[tuple[str, TypeSig]]
     ret: TypeSig
-    body: Stmt
+    body: SBlock
 
 
 @dataclass
@@ -169,5 +175,5 @@ class DClass(Decl):
 
 
 @dataclass
-class File:
+class File(AST):
     decls: list[Decl]

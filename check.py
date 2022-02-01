@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import cast, overload, Iterator, Union
 from contextlib import contextmanager
 from syntax import *
 
@@ -50,34 +51,40 @@ class CheckError(Exception):
     ...
 
 
+Env = dict[str, Type]
+
+
 class Check:
 
-    envs = []
-    ret = None
+    filename: str
+    src: list[str]
 
-    classes = [{}]
-    cls = None
+    envs: list[Env] = []
+    ret: Type = cast(Type, None)
 
-    errors = []
+    classes: list[tuple[Type, Env]] = [(cast(Type, None), {})]
+    # cls: Type = cast(Type, None)
+
+    errors: list[CheckError] = []
 
     def __init__(self, filename, src):
         self.filename = filename
         self.src = src.split("\n")
 
     @contextmanager
-    def new_scope(self):
+    def new_scope(self) -> Iterator[None]:
         self.envs.append({})
         yield
         self.envs.pop()
 
     @contextmanager
-    def gather_errors(self):
+    def gather_errors(self) -> Iterator[None]:
         try:
             yield
         except CheckError as e:
             self.errors.append(e)
 
-    def format_errors(self):
+    def format_errors(self) -> str:
         out = []
         for err in self.errors:
             msg, loc = err.args
@@ -96,27 +103,29 @@ class Check:
             )
         return "\n\n".join(out)
 
-    def has_type(self, ast, type):
+    def has_type(self, ast: Lit | Expr | TypeSig | Stmt | Decl, type: Type) -> Type:
         t = self.check(ast)
         if t != type:
             raise CheckError(f"Expected type '{type}' but found '{t}'", ast.loc)
         return t
 
-    def check_var_decl(self, decl, env):
+    def check_var_decl(self, decl: VarDecl, env: Env) -> None:
         if decl.name in env:
             raise CheckError(
-                f"Cannot redeclare existing variable '{decl.name}'", name.loc
+                f"Cannot redeclare existing variable '{decl.name}'", decl.loc
             )
-        if decl.sig:
+        if decl.sig and decl.value:
             t = self.has_type(decl.value, self.check(decl.sig))
-        else:
+        elif decl.sig:
+            t = self.check(decl.sig)
+        elif decl.value:
             t = self.check(decl.value)
         env[decl.name] = t
 
-    def check_lit(self, lit):
+    def check_lit(self, lit: Lit) -> Type:
         match lit:
             case LStr(_):
-                return self.classes["String"]
+                return self.classes[0][1]["String"]
             case LChar(_):
                 return TPrim("char")
             case LNum(n):
@@ -128,12 +137,12 @@ class Check:
             case _:
                 raise UserWarning(lit)
 
-    def check_typesig(self, typesig):
+    def check_typesig(self, typesig: TypeSig) -> Type:
         match typesig:
             case TsArr(t):
                 return TArr(self.check(t))
             case TsCall(t, ts):
-                return TCall(self.check(t), [self.check(t) for t in ts])
+                return TCall(t, [self.check(t) for t in ts])
             case TsVar(name):
                 prims = (
                     "i8",
@@ -148,19 +157,19 @@ class Check:
                 if name in prims:
                     return TPrim(name)
 
-                for c_env in self.classes:
+                for _, c_env in self.classes:
                     if name in c_env:
                         return c_env[name]
                 raise CheckError(f"Unbound type '{name}'", typesig.loc)
             case _:
                 raise UserWarning(typesig)
 
-    def check_expr(self, expr):
+    def check_expr(self, expr: Expr) -> Type:
         t = self._check_expr_impl(expr)
-        expr.type = t
+        expr.annot = t
         return t
 
-    def _check_expr_impl(self, expr):
+    def _check_expr_impl(self, expr: Expr) -> Type:
         match expr:
             case EAssign(lhs, _, rhs):
                 return self.has_type(rhs, self.check(lhs))
@@ -189,24 +198,29 @@ class Check:
                         raise CheckError(
                             f"Type '{t}' has no attribute '{attr}'", target.loc
                         )
+                # mypy bug: it thinks there needs to be a return here
+                return cast(Type, None)
             case ELit(lit):
                 return self.check(lit)
             case EVar(name):
-                for e in self.envs + self.classes:
+                for e in self.envs + [c[1] for c in self.classes]:
                     if name in e:
                         return e[name]
                 raise CheckError(f"Unbound symbol '{name}'", expr.loc)
             case _:
                 raise UserWarning(expr)
 
-    def check_stmt(self, stmt):
+    def check_stmt(self, stmt: Stmt) -> None:
         match stmt:
             case SDecl(var_decl):
                 self.check_var_decl(var_decl, self.envs[-1])
             case SBreak() | SContinue():
                 ...
             case SReturn(value):
-                self.has_type(value, self.ret)
+                if value:
+                    self.has_type(value, self.ret)
+                elif self.ret != TPrim("void"):
+                    raise CheckError("Expected return value", stmt.loc)
             case SExpr(expr):
                 self.check(expr)
 
@@ -228,38 +242,35 @@ class Check:
             case _:
                 raise UserWarning(stmt)
 
-    def check_decl(self, decl):
+    def check_decl(self, decl: Decl) -> None:
         match decl:
             case DDecl(var_decl):
-                self.check_var_decl(var_decl, self.classes[-1])
+                self.check_var_decl(var_decl, self.classes[-1][1])
             case DClass(mod, name, body):
-                c_env = {}
-                before = self.cls
-                self.cls = TClass(name, c_env)
-                self.classes.append(c_env)
+                c_env: Env = {}
+                cls = TClass(name, c_env)
+                self.classes.append((cls, c_env))
 
                 cs = list(filter(lambda d: isinstance(d, DClass), body))
                 ds = list(filter(lambda d: isinstance(d, DDecl), body))
                 fs = list(filter(lambda d: isinstance(d, DFunc), body))
 
-                for c in cs:
-                    self.check_decl(c)
-                for d in ds:
-                    self.check_var_decl(d)
+                for d in cs + ds:
+                    self.check_decl(d)
                 for f in fs:
+                    f = cast(DFunc, f)
                     ts = []
                     for t in [a[1] for a in f.args] + [f.ret]:
                         with self.gather_errors():
                             ts.append(self.check(t))
-                    self.classes[-1][f.name] = TFunc(ts[:-1], ts[-1])
+                    self.classes[-1][1][f.name] = TFunc(ts[:-1], ts[-1])
                 for f in fs:
                     self.check_decl(f)
 
                 self.classes.pop()
-                self.classes[-1][name] = self.cls
-                self.cls = before
+                self.classes[-1][1][name] = cls
             case DFunc(mod, name, args, ret, body):
-                assert name in self.classes[-1]
+                assert name in self.classes[-1][1]
                 if body == ";":
                     return
                 with self.new_scope():
@@ -271,6 +282,14 @@ class Check:
                     with self.gather_errors():
                         for s in body.stmts:
                             self.check(s)
+
+    @overload
+    def check(self, _: Lit | TypeSig | Expr) -> Type:
+        ...
+
+    @overload
+    def check(self, _: Stmt | Decl) -> None:
+        ...
 
     def check(self, ast):
         match ast:
@@ -286,6 +305,8 @@ class Check:
                 self.check_decl(ast)
             case _:
                 raise UserWarning(ast)
+
+        return None
 
     def check_file(self, file):
         for cls in file.decls:
