@@ -53,6 +53,30 @@ class TClass(Type):
         return False
 
 
+prims = (
+    TPrim("i8"),
+    TPrim("i16"),
+    TPrim("i32"),
+    TPrim("i64"),
+    TPrim("f32"),
+    TPrim("f64"),
+    TPrim("char"),
+    TPrim("void"),
+    TPrim("bool"),
+)
+
+wrappers = (
+    TClass("Byte", {}),
+    TClass("Short", {}),
+    TClass("Integer", {}),
+    TClass("Long", {}),
+    TClass("Float", {}),
+    TClass("Double", {}),
+    TClass("Character", {}),
+    TClass("Void", {}),
+    TClass("Bool", {}),
+)
+
 t_bool = TPrim("bool")
 t_void = TPrim("void")
 
@@ -114,20 +138,6 @@ class Check:
         return "\n\n".join(out)
 
     def upcast(self, t1: Type, t2: Type) -> Type | None:
-
-        Cast = list[tuple[Type, ...]]
-
-        int_cast: Cast = [
-            (TPrim("i8"), TClass("Byte", {})),
-            (TPrim("i16"), TClass("Short", {})),
-            (TPrim("i32"), TClass("Integer", {})),
-            (TPrim("i64"), TClass("Long", {})),
-        ]
-        float_cast: Cast = [
-            (TPrim("f32"), TClass("Float", {})),
-            (TPrim("f64"), TClass("Double", {})),
-        ]
-
         def idx(t: Type, ts: list[tuple[Type, ...]]) -> int | None:
             for i, group in enumerate(ts):
                 if t in group:
@@ -137,9 +147,11 @@ class Check:
         if t1 == t2:
             return t1
 
-        for cast in (int_cast, float_cast):
-            i = idx(t1, cast)
-            j = idx(t2, cast)
+        cast: list[tuple[Type, ...]] = list(zip(prims, wrappers))
+
+        for c in (cast[:4], cast[4:6]):
+            i = idx(t1, c)
+            j = idx(t2, c)
             if i is not None and j is not None:
                 if i >= j:
                     return t1
@@ -196,18 +208,9 @@ class Check:
             case TsCall(t, ts):
                 return TCall(t, [self.check(t) for t in ts])
             case TsVar(name):
-                prims = (
-                    "i8",
-                    "i16",
-                    "i32",
-                    "i64",
-                    "f32",
-                    "f64",
-                    "char",
-                    "void",
-                )
-                if name in prims:
-                    return TPrim(name)
+                p = TPrim(name)
+                if p in prims:
+                    return p
 
                 for _, c_env in self.classes:
                     if name in c_env:
@@ -231,23 +234,8 @@ class Check:
             case EOp(lhs, op, rhs):
                 tl = self.check(lhs)
                 tr = self.check(rhs)
-                arith = tuple(
-                    TPrim(t) for t in ("i8", "i16", "i32", "i64", "f32", "f64")
-                ) + tuple(
-                    TClass(t, {})
-                    for t in (
-                        "Byte",
-                        "Short",
-                        "Integer",
-                        "Long",
-                        "Float",
-                        "Double",
-                        "Character",
-                    )
-                )
-                other = arith + (
-                    tuple(TPrim(t) for t in ("char", "void")) + (TClass("Boolean", {}),)
-                )
+                arith = tuple(prims[:6]) + tuple(wrappers[:6])
+                other = arith + prims[-3:] + (wrappers[-3], wrappers[-1])
                 string = TClass("String", {})
                 valid_str = (
                     op == "+"
