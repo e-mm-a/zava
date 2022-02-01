@@ -34,7 +34,7 @@ var_decl : "var" VAR ":" typesig ["=" expr]
 
     ?!e_assign : e_cast (("="|"+="|"-="|"*="|"/="|"%=") e_assign)?
 
-    ?!e_cast : op_cmp ("as" typesig)?
+    ?e_cast : op_cmp ("as" typesig)?
 
     ?!op_cmp : op_ord (("=="|"!=") op_cmp)?
 
