@@ -47,6 +47,10 @@ class TClass(Type):
     env: dict[str, Type]
 
 
+t_bool = TPrim("bool")
+t_void = TPrim("void")
+
+
 class CheckError(Exception):
     ...
 
@@ -63,7 +67,6 @@ class Check:
     ret: Type = cast(Type, None)
 
     classes: list[tuple[Type, Env]] = [(cast(Type, None), {})]
-    # cls: Type = cast(Type, None)
 
     errors: list[CheckError] = []
 
@@ -179,7 +182,7 @@ class Check:
             case EOp(lhs, op, rhs):
                 t = self.has_type(rhs, self.check(lhs))
                 if op in ("==", "!=", "<", ">", "<=", ">="):
-                    t = TPrim("bool")
+                    t = t_bool
                 return t
             case ECall(fn, args):
                 match self.check(fn):
@@ -219,7 +222,7 @@ class Check:
             case SReturn(value):
                 if value:
                     self.has_type(value, self.ret)
-                elif self.ret != TPrim("void"):
+                elif self.ret != t_void:
                     raise CheckError("Expected return value", stmt.loc)
             case SExpr(expr):
                 self.check(expr)
@@ -230,12 +233,12 @@ class Check:
                         for s in stmts:
                             self.check(s)
             case SIf(cond, body, orelse):
-                self.has_type(cond, TPrim("bool"))
+                self.has_type(cond, t_bool)
                 self.check(body)
                 if orelse:
                     self.check(orelse)
             case SWhile(cond, step, body):
-                self.has_type(cond, TPrim("bool"))
+                self.has_type(cond, t_bool)
                 if step:
                     self.check(step)
                 self.check(body)
