@@ -2,7 +2,12 @@ from dataclasses import dataclass, make_dataclass
 
 def data(cls):
     for k, v in cls.__annotations__.items():
-        d = make_dataclass(k, [(f"u{i}", v) for i, v in enumerate(v)], bases=(cls,))
+        d = make_dataclass(
+            k,
+            [(f"u{i}", v) for i, v in enumerate(v)],
+            bases=(cls,),
+            repr=False,
+        )
         globals()[k] = d
         setattr(cls, k, d)
     return cls
@@ -20,7 +25,6 @@ class Lit:
 class TypeSig:
     TSArr: ["TypeSig"]
     TSCall: [str, ["TypeSig"]]
-    TSPrim: [str]
     TSVar: [str]
 
 @data

@@ -5,10 +5,12 @@ from pprint import pprint
 import parse
 import check
 
-with open(sys.argv[1], "r") as f:
+path = sys.argv[1]
+
+with open(path, "r") as f:
     src = f.read()
 
 ast = parse.parse(src)
 
-c = check.Check(src)
+c = check.Check(path, src)
 c.check_file(ast)
