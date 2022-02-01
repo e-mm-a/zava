@@ -4,13 +4,20 @@ import sys
 from pprint import pprint
 import parse
 import check
+import codegen
 
 path = sys.argv[1]
 
-with open(path, "r") as f:
-    src = f.read()
 
-ast = parse.parse(src)
+def gen(path, c):
+    with open(path, "r") as f:
+        src = f.read()
 
-c = check.Check(path, src)
-c.check_file(ast)
+    file = parse.parse(src)
+    c.check_file(file, path, src)
+    return codegen.CodeGen().gen_file(file)
+
+
+c = check.Check()
+gen("example/Header.zava", c)
+print(gen(path, c))

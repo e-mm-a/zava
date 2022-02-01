@@ -29,7 +29,7 @@ class LNum(Lit):
 
 
 class TypeSig(AST):
-    ...
+    annot: Any
 
 
 @dataclass

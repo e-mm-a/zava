@@ -63,16 +63,17 @@ class Check:
     filename: str
     src: list[str]
 
-    envs: list[Env] = []
-    ret: Type = cast(Type, None)
+    envs: list[Env]
+    ret: Type
 
-    classes: list[tuple[Type, Env]] = [(cast(Type, None), {})]
+    classes: list[tuple[Type, Env]]
 
-    errors: list[CheckError] = []
+    errors: list[CheckError]
 
-    def __init__(self, filename, src):
-        self.filename = filename
-        self.src = src.split("\n")
+    def __init__(self) -> None:
+        self.envs = []
+        self.classes = [(cast(Type, None), {})]
+        self.errors = []
 
     @contextmanager
     def new_scope(self) -> Iterator[None]:
@@ -141,6 +142,11 @@ class Check:
                 raise UserWarning(lit)
 
     def check_typesig(self, typesig: TypeSig) -> Type:
+        t = self._check_typesig_impl(typesig)
+        typesig.annot = t
+        return t
+
+    def _check_typesig_impl(self, typesig: TypeSig) -> Type:
         match typesig:
             case TsArr(t):
                 return TArr(self.check(t))
@@ -311,7 +317,10 @@ class Check:
 
         return None
 
-    def check_file(self, file):
+    def check_file(self, file: File, path: str, src: str) -> None:
+        self.filename = path
+        self.src = src.split("\n")
+
         for cls in file.decls:
             self.check(cls)
 

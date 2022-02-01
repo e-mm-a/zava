@@ -1,0 +1,11 @@
+class String { }
+
+class Integer {
+    fn toString(_: i32) String;
+}
+
+class System {
+    class out {
+        fn println(_: String) void;
+    }
+}
